@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radial D-pad keyboard test</title>
+<title>Radial D-pad keyboard</title>
 <style>
   :root { --bg:#12141a; --panel:#1b1f29; --fg:#e8eaf0; --dim:#8a91a3; --acc:#5aa2ff; --line:#2a3040; }
   * { box-sizing: border-box; }
@@ -37,7 +37,7 @@
           padding:6px 10px; font-size:14px; color:var(--dim); }
   .chip::before { content:""; position:absolute; inset:0; background:rgba(90,162,255,.35); transform-origin:left; transform:scaleX(0); }
   .chip.down { color:var(--fg); border-color:var(--acc); }
-  .chip.hold::before { animation:fill .5s linear .2s forwards; }
+  .chip.hold::before { animation:fill 1.1s linear .4s forwards; }
   @keyframes fill { to { transform:scaleX(1); } }
   .chip span { position:relative; }
   #overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
@@ -58,20 +58,28 @@
     #field { font-size:26px; }
     .chip[data-code^="Arrow"] { display:none; }
   }
+  #wheel { display:block; width:min(520px,100%); aspect-ratio:1; gap:0; }
+  #fx { width:100%; height:100%; display:block; touch-action:none; }
+  #fx text { fill:var(--fg); font-family:system-ui,sans-serif; pointer-events:none; user-select:none; }
+  #fx .sec { fill:var(--panel); stroke:var(--bg); stroke-width:1.5; }
+  #fx .anc { fill:#27406b; }
+  #fx .dim { fill:#171a22; }
+  #fx .sel { stroke:var(--acc); stroke-width:2; cursor:pointer; fill:#222a3a; }
+  #fx .arrow { fill:var(--acc); }
+  #fx .hub { fill:var(--bg); stroke:var(--line); stroke-dasharray:4 4; }
+  #fx text.dimtxt { fill:var(--dim); }
 </style>
 </head>
 <body>
-<h1>Radial D-pad keyboard · interactive test</h1>
+<h1>Radial D-pad keyboard · interactive prototype</h1>
 <div id="field"></div>
 <div id="path"></div>
-<div id="wheel">
-  <div class="cell" id="u"></div><div class="cell" id="l"></div><div class="cell" id="center"></div><div class="cell" id="r"></div><div class="cell" id="d"></div>
-</div>
+<div id="wheel"><svg id="fx" viewBox="-250 -250 500 500" xmlns="http://www.w3.org/2000/svg"></svg></div>
 <div id="keys"></div>
 <div id="log"></div>
 <div class="note">
-  <p><b>Idea:</b> text entry with only the four arrow keys of a TV remote. Every character is a 4×4×4 tree: the first press picks one of 4 sectors, the second one of 4 groups, the third one of 4 characters. Exactly 3 presses per character, no OK needed to select, no timeouts, learnable blind.</p>
-  <p>Use your keyboard to emulate a remote: <code>↑ ↓ ← →</code> choose a sector. <code>Enter</code> (OK): short press in the root = space, long press (0.7 s) = confirm. <code>Backspace</code> (Back): erase a character / go up one level; hold to auto-repeat; on an empty field it closes the keyboard. <code>M</code> (Menu): short = next layout, long = layout picker. <code>Esc</code> (Home): close and discard.</p>
+  <p><b>Idea:</b> text entry with only the four arrow keys of a TV remote. Every character is a 4×4×4 tree, drawn as three concentric rings (4 sectors → 16 groups → 64 characters) with a fisheye effect: each press blows up the chosen sector so its four children sit on the four arrow directions. the first press picks one of 4 sectors, the second one of 4 groups, the third one of 4 characters. Exactly 3 presses per character, no OK needed to select, no timeouts, learnable blind.</p>
+  <p>Use your keyboard to emulate a remote: <code>↑ ↓ ← →</code> choose a sector. <code>Enter</code> (OK): short press (under 0.4 s) in the root = space, long press (1.5 s, a green ring grows in the centre) = confirm. <code>Backspace</code> (Back): erase a character / go up one level; hold 1.5 s (red ring) to auto-repeat erase; on an empty field it closes the keyboard. <code>M</code> (Menu): short = next layout (carousel), long = zoom out to see all layouts (←/→ browse, Enter pick, Backspace cancel). <code>Esc</code> (Home): close and discard.</p>
   <p><b>On a phone / with a mouse:</b> tap the four sectors for the arrows, and use the OK / Back / Menu / Home buttons below. Press and hold works the same as on a keyboard (the button fills while you hold).</p>
   <p>Feedback welcome: how does it feel after a minute of typing? Is the long-press logic sensible on a real remote? Would you group letters differently (e.g. by frequency instead of alphabetically)?</p>
 </div>
@@ -114,34 +122,196 @@ const group = (q,g) => { const grp = LAYOUTS[layout][q][g]; return typeof grp ==
 function log(html){ $('log').innerHTML = html; }
 
 // ---------- rendering ----------
+const SVGNS = 'http://www.w3.org/2000/svg';
+const RING = { q:[58,104], g:[107,170], l:[173,246] };
+let wcur = new Array(64).fill(1), raf = 0;
+// When a sector at compass position a is opened, its children (numbered clockwise 1..4) land on:
+//   1 -> one step counter-clockwise from a, 2 -> a itself, 3 -> one step clockwise, 4 -> two steps clockwise.
+// Child k therefore sits on arrow (k + a - 1); the first level (the 4 quadrants) simply sits on the arrows in order.
+const ARRANG = [-90, 0, 90, 180];
+function resolve(p){
+  const sel=[], ms=[0];
+  for(let lv=0; lv<p.length; lv++){
+    const a = DIRS.indexOf(p[lv]);
+    sel.push((a-ms[lv]+4)%4);
+    ms.push((a+3)%4);
+  }
+  return { sel, ms, c: 0 };
+}
+const steadyStart = p => p.length===0 ? -135 : ARRANG[(DIRS.indexOf(p[p.length-1])+3)%4] - 45;   // where the focused sector's arc begins once opened
+const qi = () => resolve(path).sel[0], gi = () => resolve(path).sel[1];
+
+function targetWeights(){
+  const w = new Array(64).fill(1);
+  if(path.length === 1){ for(let i=0;i<64;i++) w[i] = (i>>4)===qi() ? 1 : 0; }
+  else if(path.length === 2){ for(let i=0;i<64;i++) w[i] = (i>>2)===(qi()*4+gi()) ? 1 : 0; }
+  return w;
+}
+function pt(r, deg){ const a = deg*Math.PI/180; return [r*Math.cos(a), r*Math.sin(a)]; }
+function arc(r0, r1, a0, a1){
+  if(a1 - a0 > 359.5) a1 = a0 + 359.5;
+  const [x0,y0]=pt(r1,a0), [x1,y1]=pt(r1,a1), [x2,y2]=pt(r0,a1), [x3,y3]=pt(r0,a0);
+  const big = (a1-a0) > 180 ? 1 : 0;
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r1} ${r1} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}A${r0} ${r0} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z`;
+}
+function groupLabel(q,g){ const a = group(q,g); return a.some(x=>chars(x).length>1) ? a[0]+'…' : a.join(''); }
+
+function wheelCore(){
+  const RS = resolve(path);
+  const tot = wcur.reduce((x,y)=>x+y,0);
+  const cum = [0]; for(let i=0;i<64;i++) cum.push(cum[i] + wcur[i]/tot*360);
+  let f0 = 0, f1 = 64;
+  if(path.length===1){ f0 = qi()*16; f1 = f0+16; }
+  else if(path.length===2){ f0 = (qi()*4+gi())*4; f1 = f0+4; }
+  const O = Ocur;
+  const A = i => O + cum[i];
+  let out = '';
+  const label = (txt, r, a0, a1, size, cls, ring) => {
+    const w = (a1-a0)*Math.PI/180*r;
+    const fs = Math.min(size, w/(Math.max(1,chars(txt).length)*0.62));
+    if(fs < 7.5) return '';
+    const [x,y] = pt(r,(a0+a1)/2);
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${fs.toFixed(1)}" class="${cls}">${escapeHtml(txt)}</text>`;
+  };
+  const selRing = path.length===0 ? 'q' : path.length===1 ? 'g' : 'l';
+  const focusOf = (ring, idx) => {           // is this sector inside the focused node?
+    if(path.length===0) return true;
+    if(path.length===1) return ring==='q' ? idx===qi() : ring==='g' ? (idx>>2)===qi() : (idx>>4)===qi();
+    const g = qi()*4+gi();
+    return ring==='q' ? idx===qi() : ring==='g' ? idx===g : (idx>>2)===g;
+  };
+  const isAnc = (ring, idx) => (ring==='q' && path.length>=1 && idx===qi()) || (ring==='g' && path.length>=2 && idx===qi()*4+gi());
+  const sector = (ring, idx, a0, a1, txt, dirIdx) => {
+    if(a1-a0 < 0.05) return '';
+    const sel = open && !noSel && ring===selRing && dirIdx !== null;
+    let cls = 'sec' + (isAnc(ring,idx) ? ' anc' : (!focusOf(ring,idx) ? ' dim' : '')) + (sel ? ' sel' : '');
+    const [r0,r1] = RING[ring];
+    let h = `<path class="${cls}" d="${arc(r0,r1,a0,a1)}"${sel ? ` data-dir="${DIRS[dirIdx]}"` : ''}/>`;
+    const rm = (r0+r1)/2;
+    if(sel){
+      const w = (a1-a0)*Math.PI/180*rm;
+      h += label(ARROW[DIRS[dirIdx]], r0+9, a0, a1, 15, 'arrow', ring).replace('<text','<text class="arrow"').replace('class="arrow" class="arrow"','class="arrow"');
+      h += label(txt, rm+(ring==='l' ? 10 : 6), a0, a1, ring==='l' ? 38 : 17, '', ring);
+    } else if(ring==='q'){
+      h += label(path.length===0 ? ARROW[DIRS[idx]] : '', rm, a0, a1, 26, 'dimtxt', ring);
+    } else {
+      h += label(txt, rm, a0, a1, ring==='l' ? 15 : 17, focusOf(ring,idx) ? '' : 'dimtxt', ring);
+    }
+    return h;
+  };
+  // quadrants
+  for(let q=0;q<4;q++) out += sector('q', q, A(q*16), A(q*16+16), '', path.length===0 ? q : null);
+  // groups
+  for(let j=0;j<16;j++){
+    const q=j>>2, g=j&3;
+    const dirIdx = path.length===1 && q===qi() ? (g+RS.ms[1])%4 : null;
+    out += sector('g', j, A(j*4), A(j*4+4), groupLabel(q,g), dirIdx);
+  }
+  // leaves
+  for(let i=0;i<64;i++){
+    const q=i>>4, g=(i>>2)&3, k=i&3;
+    const dirIdx = path.length===2 && (i>>2)===(qi()*4+gi()) ? (k+RS.ms[2])%4 : null;
+    out += sector('l', i, A(i), A(i+1), leaf(q,g,k), dirIdx);
+  }
+  out += `<circle class="hub" r="54"/>`;
+  if(holdProg > 0){ const rr = 6 + 48*holdProg; out += `<circle r="${rr.toFixed(1)}" fill="${holdColor}"/>`; }
+  const hubTxt = (fill, extra) => `<g ${extra}><text x="0" y="-8" text-anchor="middle" font-size="17" font-weight="600" style="fill:${fill}">${layout}</text>` +
+    `<text x="0" y="14" text-anchor="middle" font-size="12" style="fill:${fill}">${open ? ['root','group','character'][path.length] : 'closed'}</text></g>`;
+  out += hubTxt('var(--fg)', '');
+  if(holdProg > 0){   // same text again in dark ink, revealed only where the green disc covers it (mask effect)
+    const rr = 6 + 48*holdProg;
+    out += `<clipPath id="hubclip"><circle r="${rr.toFixed(1)}"/></clipPath>` + hubTxt(holdInk, 'clip-path="url(#hubclip)"');
+  }
+  return out;
+}
+let noSel = false;
+function wheelSvg(name, live){
+  const sv = { path, wcur, Ocur, holdProg, layout };
+  if(!live){ path = []; wcur = new Array(64).fill(1); Ocur = -135; holdProg = 0; }
+  layout = name;
+  noSel = !live || pickerIdx !== null;
+  const out = wheelCore();
+  ({ path, wcur, Ocur, holdProg, layout } = sv);
+  return out;
+}
+// ---- carousel camera: wheels sit on an endless ring; camPos = which one is centred, camS = zoom (1 = one wheel, 0.3 = all three) ----
+let camPos = 0, camTarget = 0, camS = 1, camSTarget = 1, ovOrig = 0;
+function draw(){
+  const svg = $('fx');
+  svg.style.opacity = open ? 1 : .25;
+  const S = camS, SP = 560*S, liveIdx = NAMES.indexOf(layout);
+  const selIdx = pickerIdx !== null ? pickerIdx : liveIdx;
+  const lab = Math.max(0, Math.min(1, (0.85 - S)/0.45));
+  let out = '';
+  for(let i=0;i<NAMES.length;i++){
+    const d = ((((i - camPos + 1.5) % 3) + 3) % 3) - 1.5;
+    const x = d*SP;
+    if(Math.abs(x) > 250 + 250*S) continue;
+    out += `<g transform="translate(${x.toFixed(1)},0) scale(${S.toFixed(3)})" data-wheel="${i}">${wheelSvg(NAMES[i], i===liveIdx)}</g>`;
+    if(lab > 0){
+      out += `<circle cx="${x.toFixed(1)}" cy="0" r="${(252*S).toFixed(1)}" fill="none" stroke="${i===selIdx ? 'var(--acc)' : 'transparent'}" stroke-width="2" opacity="${lab.toFixed(2)}"/>`;
+      out += `<text x="${x.toFixed(1)}" y="${(252*S+24).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="${i===selIdx ? 700 : 500}" style="fill:${i===selIdx ? 'var(--acc)' : 'var(--dim)'};opacity:${lab.toFixed(2)}">${NAMES[i]}</text>`;
+    }
+  }
+  svg.innerHTML = out;
+}
+let holdProg = 0, holdCode = null, holdStart = 0, holdRaf = 0, holdColor = '#2fc766', holdInk = '#06210f';
+function startHold(code, color, ink){
+  holdStart = performance.now(); holdCode = code; holdColor = color; holdInk = ink;
+  const step = () => {
+    if(holdCode !== code) return;
+    const e = performance.now() - holdStart;
+    holdProg = Math.max(0, Math.min(1, (e - RING_MS) / (LONG_MS - RING_MS)));
+    draw();
+    if(holdProg < 1) holdRaf = requestAnimationFrame(step);
+  };
+  step();
+}
+function stopHold(){ holdCode = null; holdProg = 0; cancelAnimationFrame(holdRaf); draw(); }
+const animSpeed = 2;
+let lastT = 0;
+let Ocur = -135, Sa = -135, Sat = -135, anchorF0 = 0, prevPath = [];
+const wrap180 = x => (((x+540)%360)+360)%360 - 180;
+function cumOf(w){ const t = w.reduce((x,y)=>x+y,0), c=[0]; for(let i=0;i<64;i++) c.push(c[i]+w[i]/t*360); return c; }
+function nodeF0(p){ const r = resolve(p).sel; return p.length===0 ? 0 : p.length===1 ? r[0]*16 : (r[0]*4+r[1])*4; }
+function onPathChange(){
+  const old = prevPath, now = path.slice(), cc = cumOf(wcur);
+  const f0o = nodeF0(old), f0n = nodeF0(now);
+  const pref = (x,y) => x.length<=y.length && x.every((v,i)=>v===y[i]);
+  if(pref(old, now)){                       // zoom in: the chosen sector grows where it is, turning the nearest way so its children land on the arrows
+    anchorF0 = f0n; Sa = Ocur + cc[f0n]; Sat = Sa + wrap180(steadyStart(now) - Sa);
+  } else if(pref(now, old)){                // zoom out: the sector we leave turns back the nearest way into its slot
+    anchorF0 = f0o; Sa = Ocur + cc[f0o];
+    const tc = cumOf(targetWeights()), tstart = steadyStart(now) - tc[f0n] + tc[f0o];
+    let dl = wrap180(tstart - Sa); if(dl === -180) dl = 180;
+    Sat = Sa + dl;
+  } else { anchorF0 = f0n; Sa = Ocur + cc[f0n]; Sat = Sa + wrap180(steadyStart(now) - Sa); }
+  prevPath = now;
+}
+function tick(t){
+  const dt = lastT ? Math.min(50, t - lastT) : 16.7; lastT = t;
+  const fk = 1 - Math.pow(1 - 0.2, animSpeed * dt / 16.7);   // frame-rate independent easing; 0.2 per frame at x1.00
+  if(path.join() !== prevPath.join()) onPathChange();
+  const wt = targetWeights();
+  let moving = false;
+  for(let i=0;i<64;i++){ const d = wt[i]-wcur[i]; if(Math.abs(d) > 0.002*Math.max(1,wt[i])){ wcur[i] += d*fk; moving = true; } else wcur[i] = wt[i]; }
+  if(Math.abs(Sat-Sa) > 0.05){ Sa += (Sat-Sa)*fk; moving = true; } else Sa = Sat;
+  Ocur = Sa - cumOf(wcur)[anchorF0];
+  if(Math.abs(camTarget-camPos) > 0.002){ camPos += (camTarget-camPos)*0.16; moving = true; } else camPos = camTarget;
+  if(Math.abs(camSTarget-camS) > 0.002){ camS += (camSTarget-camS)*0.16; moving = true; } else camS = camSTarget;
+  draw();
+  if(!moving) lastT = 0;
+  raf = moving ? requestAnimationFrame(tick) : 0;
+}
 function render(){
   const f = $('field');
   f.className = open ? 'active' : '';
   f.innerHTML = (text ? escapeHtml(text) : '') + (open ? '<span class="caret"></span>' : (text ? '' : '<span style="color:var(--dim)">Press Enter to open the keyboard</span>'));
   $('path').textContent = open ? `${layout}  ·  path: ${path.map(d=>ARROW[d]).join(' ') || '—'}` : '';
-  DIRS.forEach(d => { const el=$(CELL_ID[d]); el.classList.remove('hit'); el.classList.toggle('empty', !open); });
-  const c = $('center');
-  c.classList.toggle('empty', !open);
-  c.innerHTML = `<b>${layout}</b><span>${['root','group','character'][path.length] || ''}</span>`;
-  if(!open) return;
-  DIRS.forEach((d, idx) => {
-    const el = $(CELL_ID[d]);
-    let html = `<div class="arrow">${ARROW[d]}</div>`;
-    if(path.length === 0){
-      html += `<div class="small">${LAYOUTS[layout][idx].map((g,gi)=>{ const a=group(idx,gi); return a.some(x=>chars(x).length>1) ? escapeHtml(a[0])+'…' : a.join(''); }).join('<br>')}</div>`;
-    } else if(path.length === 1){
-      const q = DIRS.indexOf(path[0]);
-      const g2=group(q,idx); html += `<div class="mid${g2.some(x=>chars(x).length>1)?' long':''}">${g2.map(escapeHtml).join(' ')}</div>`;
-    } else {
-      const q = DIRS.indexOf(path[0]), g = DIRS.indexOf(path[1]);
-      const v = leaf(q,g,idx);
-      html += `<div class="big${chars(v).length>1?' long':''}">${escapeHtml(v)}</div>`;
-    }
-    el.innerHTML = html;
-  });
+  if(!raf) raf = requestAnimationFrame(tick);
 }
 function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function flash(d){ const el=$(CELL_ID[d]); el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),150); }
+function flash(d){}
 
 // ---------- actions ----------
 function pressDir(d){
@@ -149,7 +319,7 @@ function pressDir(d){
   flash(d);
   path.push(d);
   if(path.length === 3){
-    const v = leaf(DIRS.indexOf(path[0]), DIRS.indexOf(path[1]), DIRS.indexOf(path[2]));
+    const rs = resolve(path).sel; const v = leaf(rs[0], rs[1], rs[2]);
     text += v;
     log(`Typed: <b>${escapeHtml(v)}</b> (${path.map(x=>ARROW[x]).join('')})`);
     path = [];
@@ -179,29 +349,40 @@ function okLong(){
   log(`<b>Done:</b> “${escapeHtml(text)}”`);
   render();
 }
-function menuLong(){
-  if(!open || pickerIdx !== null) return;
-  pickerIdx = NAMES.indexOf(layout); renderPicker();
+function resetWheelState(){ path = []; prevPath = []; wcur = new Array(64).fill(1); Sa = Sat = Ocur = -135; anchorF0 = 0; }
+function switchLayout(dir){                      // short Menu: next layout slides in like an endless carousel
+  resetWheelState();
+  layout = NAMES[(NAMES.indexOf(layout) + dir + NAMES.length) % NAMES.length];
+  camTarget += dir;
+  log(`Layout: <b>${layout}</b>`); render();
 }
+function menuLong(){                             // long Menu: camera pulls back to show every layout
+  if(!open || pickerIdx !== null) return;
+  resetWheelState();
+  pickerIdx = NAMES.indexOf(layout); ovOrig = camTarget; camSTarget = 0.3;
+  log('Choose a layout: ←/→ to browse, OK to pick, Back to cancel.'); render();
+}
+function closeOverview(){ pickerIdx = null; camSTarget = 1; render(); }
 function home(){
-  if(pickerIdx !== null){ pickerIdx = null; renderPicker(); }
+  if(pickerIdx !== null){ camTarget = ovOrig; closeOverview(); return; }
   if(open){ open = false; path = []; text = ''; log('Home: keyboard closed, input discarded.'); render(); }
 }
-function renderPicker(){
-  $('overlay').classList.toggle('show', pickerIdx !== null);
-  if(pickerIdx === null) return;
-  $('picker').innerHTML = '<h2>Layout</h2>' + NAMES.map((n,i)=>`<div class="opt ${i===pickerIdx?'sel':''}">${n}</div>`).join('');
+function pickerChoose(i){
+  let d = ((i - pickerIdx + 4) % 3) - 1; if(d === 2) d = -1;
+  camTarget += d; pickerIdx = i; layout = NAMES[i];
+  log(`Layout: <b>${layout}</b>`); closeOverview();
 }
 function pickerKey(code){
-  if(code==='ArrowUp') pickerIdx = (pickerIdx + NAMES.length - 1) % NAMES.length;
-  else if(code==='ArrowDown') pickerIdx = (pickerIdx + 1) % NAMES.length;
-  else if(code==='Enter'){ layout = NAMES[pickerIdx]; path = []; pickerIdx = null; log(`Layout: <b>${layout}</b>`); render(); }
-  else if(code==='Backspace') pickerIdx = null;
-  renderPicker();
+  const n = NAMES.length;
+  if(code==='ArrowLeft' || code==='ArrowUp'){ pickerIdx = (pickerIdx + n - 1) % n; camTarget -= 1; render(); }
+  else if(code==='ArrowRight' || code==='ArrowDown'){ pickerIdx = (pickerIdx + 1) % n; camTarget += 1; render(); }
+  else if(code==='Enter'){ layout = NAMES[pickerIdx]; log(`Layout: <b>${layout}</b>`); closeOverview(); }
+  else if(code==='Backspace'){ camTarget = ovOrig; closeOverview(); }
+  else if(code==='Escape'){ home(); }
 }
 
 // ---------- keyboard input: short / long presses ----------
-const LONG_MS = 700, RING_MS = 200;
+const LONG_MS = 1500, RING_MS = 400;   // under 0.4 s = short press; 0.4 s - 1.5 s = ring fills, release cancels; 2 s = long press
 const KEYMAP = { ArrowUp:'up', ArrowRight:'right', ArrowDown:'down', ArrowLeft:'left', Enter:'ok', Backspace:'back', KeyM:'menu', Escape:'home' };
 const CHIPS = [['←','ArrowLeft'],['↑','ArrowUp'],['↓','ArrowDown'],['→','ArrowRight'],['OK · Enter','Enter'],['Back · Backspace','Backspace'],['Menu · M','KeyM'],['Home · Esc','Escape']];
 $('keys').innerHTML = CHIPS.map(([t,c])=>`<div class="chip" data-code="${c}"><span>${t}</span></div>`).join('');
@@ -215,11 +396,13 @@ function press(code){
   if(pickerIdx !== null){ pickerKey(code); held[code] = {fired:true}; return; }
   if(action==='home'){ home(); held[code] = {fired:true}; return; }
   if(['up','right','down','left'].includes(action)){ pressDir(action); held[code] = {fired:true}; return; }
-  const h = held[code] = { fired:false };
+  const h = held[code] = { fired:false, t0: performance.now() };
   h.t1 = setTimeout(()=>ch.classList.add('hold'), RING_MS);
+  if(open && action==='ok') startHold(code, '#2fc766', '#06210f');
+  if(open && action==='back') startHold(code, '#e5484d', '#2b0507');
   h.t2 = setTimeout(()=>{
     h.fired = true;
-    if(action==='ok') okLong();
+    if(action==='ok'){ stopHold(); okLong(); }
     else if(action==='menu') menuLong();
     else if(action==='back'){ backRepeat(); h.iv = setInterval(backRepeat, 80); }
   }, LONG_MS);
@@ -231,16 +414,12 @@ function release(code){
   const h = held[code];
   if(!h) return;
   clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv);
+  if(action==='ok' || action==='back') stopHold();
   delete held[code];
-  if(h.fired) return;
+  if(h.fired || performance.now() - h.t0 > RING_MS) return;   // long-press attempt released early: cancel, no short action
   if(action==='ok') okShort();
   else if(action==='back') backShort();
-  else if(action==='menu' && open){
-    layout = NAMES[(NAMES.indexOf(layout) + 1) % NAMES.length];
-    path = [];
-    log(`Layout: <b>${layout}</b>`);
-    render();
-  }
+  else if(action==='menu' && open) switchLayout(1);
 }
 // physical keyboard
 addEventListener('keydown', e => {
@@ -258,11 +437,21 @@ function bindPointer(el, code){
   el.addEventListener('pointercancel', end);
 }
 document.querySelectorAll('.chip').forEach(el => bindPointer(el, el.dataset.code));
-Object.entries({u:'ArrowUp', r:'ArrowRight', d:'ArrowDown', l:'ArrowLeft'}).forEach(([id,code]) => bindPointer($(id), code));
+const DIRCODE = {up:'ArrowUp', right:'ArrowRight', down:'ArrowDown', left:'ArrowLeft'};
+$('fx').addEventListener('pointerdown', e => {
+  const wh = e.target.closest && e.target.closest('[data-wheel]');
+  if(pickerIdx !== null && wh){ e.preventDefault(); pickerChoose(+wh.dataset.wheel); return; }
+  const t = e.target.closest && e.target.closest('[data-dir]');
+  if(!t) return;
+  e.preventDefault();
+  const code = DIRCODE[t.dataset.dir];
+  press(code); setTimeout(() => release(code), 40);
+});
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('blur', () => {
   Object.values(held).forEach(h=>{ clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv); });
   for(const k in held) delete held[k];
+  stopHold();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('down','hold'));
 });
 
