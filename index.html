@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radial D-pad keyboard test</title>
+<style>
+  :root { --bg:#12141a; --panel:#1b1f29; --fg:#e8eaf0; --dim:#8a91a3; --acc:#5aa2ff; --line:#2a3040; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:18px/1.4 system-ui, sans-serif;
+         display:flex; flex-direction:column; align-items:center; padding:24px 16px; gap:18px; }
+  h1 { font-size:18px; font-weight:600; margin:0; color:var(--dim); }
+  #field { width:min(640px,100%); min-height:64px; background:var(--panel); border:2px solid var(--line);
+           border-radius:12px; padding:14px 18px; font-size:28px; word-break:break-all; }
+  #field.active { border-color:var(--acc); }
+  #field .caret { display:inline-block; width:2px; height:1em; background:var(--acc); vertical-align:-0.12em; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #path { color:var(--dim); font-size:15px; height:20px; }
+  #wheel { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:repeat(3,minmax(0,1fr)); gap:8px;
+           width:min(520px,100%); aspect-ratio:1; min-height:0; overflow:hidden; }
+  .cell { min-width:0; min-height:0; overflow:hidden; background:var(--panel); border:2px solid var(--line); border-radius:16px; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; gap:4px; padding:6px; text-align:center; transition:border-color .1s, transform .1s; }
+  .cell.hit { border-color:var(--acc); transform:scale(1.04); }
+  .cell .arrow { color:var(--dim); font-size:14px; }
+  .cell .big { font-size:46px; line-height:1; }
+  .cell .mid { font-size:22px; letter-spacing:.06em; max-width:100%; overflow-wrap:anywhere; }
+  .cell .mid.long { font-size:15px; letter-spacing:0; line-height:1.5; }
+  .cell .big.long { font-size:26px; }
+  .cell .small { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cell .small { font-size:14px; color:var(--dim); line-height:1.35; }
+  .cell.empty { visibility:hidden; }
+  #center { grid-area:2/2; background:transparent; border-style:dashed; font-size:15px; color:var(--dim); }
+  #center b { color:var(--fg); font-size:20px; }
+  #u{grid-area:1/2} #r{grid-area:2/3} #d{grid-area:3/2} #l{grid-area:2/1}
+  #keys { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:min(640px,100%); }
+  .chip { position:relative; overflow:hidden; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+          padding:6px 10px; font-size:14px; color:var(--dim); }
+  .chip::before { content:""; position:absolute; inset:0; background:rgba(90,162,255,.35); transform-origin:left; transform:scaleX(0); }
+  .chip.down { color:var(--fg); border-color:var(--acc); }
+  .chip.hold::before { animation:fill .5s linear .2s forwards; }
+  @keyframes fill { to { transform:scaleX(1); } }
+  .chip span { position:relative; }
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
+  #overlay.show { display:flex; }
+  #picker { background:var(--panel); border:2px solid var(--acc); border-radius:16px; padding:12px; min-width:280px; }
+  #picker h2 { margin:4px 10px 10px; font-size:15px; color:var(--dim); font-weight:500; }
+  .opt { padding:10px 14px; border-radius:10px; }
+  .opt.sel { background:var(--acc); color:#06101f; }
+  #log { width:min(640px,100%); color:var(--dim); font-size:14px; min-height:42px; }
+  #log b { color:var(--fg); }
+  #closed { color:var(--dim); font-size:15px; }
+  .note p{margin:0 0 10px} .note { max-width:640px; color:var(--dim); font-size:14px; }
+  .note code { background:var(--panel); padding:1px 5px; border-radius:4px; }
+  body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+  .chip, .cell { cursor:pointer; touch-action:none; }
+  @media (pointer:coarse) {
+    .chip { padding:16px 18px; font-size:17px; border-radius:12px; flex:1 1 40%; text-align:center; }
+    #field { font-size:26px; }
+    .chip[data-code^="Arrow"] { display:none; }
+  }
+</style>
+</head>
+<body>
+<h1>Radial D-pad keyboard · interactive test</h1>
+<div id="field"></div>
+<div id="path"></div>
+<div id="wheel">
+  <div class="cell" id="u"></div><div class="cell" id="l"></div><div class="cell" id="center"></div><div class="cell" id="r"></div><div class="cell" id="d"></div>
+</div>
+<div id="keys"></div>
+<div id="log"></div>
+<div class="note">
+  <p><b>Idea:</b> text entry with only the four arrow keys of a TV remote. Every character is a 4×4×4 tree: the first press picks one of 4 sectors, the second one of 4 groups, the third one of 4 characters. Exactly 3 presses per character, no OK needed to select, no timeouts, learnable blind.</p>
+  <p>Use your keyboard to emulate a remote: <code>↑ ↓ ← →</code> choose a sector. <code>Enter</code> (OK): short press in the root = space, long press (0.7 s) = confirm. <code>Backspace</code> (Back): erase a character / go up one level; hold to auto-repeat; on an empty field it closes the keyboard. <code>M</code> (Menu): short = next layout, long = layout picker. <code>Esc</code> (Home): close and discard.</p>
+  <p><b>On a phone / with a mouse:</b> tap the four sectors for the arrows, and use the OK / Back / Menu / Home buttons below. Press and hold works the same as on a keyboard (the button fills while you hold).</p>
+  <p>Feedback welcome: how does it feel after a minute of typing? Is the long-press logic sensible on a real remote? Would you group letters differently (e.g. by frequency instead of alphabetically)?</p>
+</div>
+<div id="overlay"><div id="picker"></div></div>
+
+<script>
+// ---------- layouts: 4 quadrants (up, right, down, left) × 4 groups × 4 leaves ----------
+const LAYOUTS = {
+  'Russian': [
+    ['абвг','дежз','ийкл',['ё','(',')',"'"]],
+    ['мноп','рсту','фхцч','шщъы'],
+    ['ьэюя','0123','4567',['8','9','.',',']],
+    [['-','_','@','/'],[':','?','!','&'],['#','+','=','%'],['https://','www.','.com','.ru']],
+  ],
+  'English': [
+    ['abcd','efgh','ijkl','mnop'],
+    ['qrst','uvwx',['y','z','.','-'],['_','@','/',':']],
+    ['0123','4567',['8','9',',','?'],['!','&','#','+']],
+    [['=','%','(',')'],["'",'"','*','~'],['№',';','<','>'],['https://','www.','.com','.ru']],
+  ],
+  'Symbols': [
+    ['0123','4567',['8','9','.',','],['-','_','@','/']],
+    [[':','?','!','&'],['#','+','=','%'],['(',')',"'",'"'],['*','~','№',';']],
+    [['<','>','[',']'],['{','}','|','\\'],['$','€','£','¥'],['^','`','°','±']],
+    [['https://','www.','.com','.ru'],['.org','.net','.io','.tv'],['ё','Ё','é','ü'],['«','»','—','…']],
+  ],
+};
+const NAMES = ['English','Russian','Symbols'];
+const DIRS = ['up','right','down','left'];
+const ARROW = {up:'↑',right:'→',down:'↓',left:'←'};
+const CELL_ID = {up:'u',right:'r',down:'d',left:'l'};
+
+// ---------- state ----------
+let text = '', open = false, layout = NAMES[0], path = [], pickerIdx = null;
+const $ = id => document.getElementById(id);
+const chars = s => Array.from(s);
+const leaf = (q,g,i) => { const grp = LAYOUTS[layout][q][g]; return typeof grp === 'string' ? chars(grp)[i] : grp[i]; };
+const group = (q,g) => { const grp = LAYOUTS[layout][q][g]; return typeof grp === 'string' ? chars(grp) : grp; };
+
+function log(html){ $('log').innerHTML = html; }
+
+// ---------- rendering ----------
+function render(){
+  const f = $('field');
+  f.className = open ? 'active' : '';
+  f.innerHTML = (text ? escapeHtml(text) : '') + (open ? '<span class="caret"></span>' : (text ? '' : '<span style="color:var(--dim)">Press Enter to open the keyboard</span>'));
+  $('path').textContent = open ? `${layout}  ·  path: ${path.map(d=>ARROW[d]).join(' ') || '—'}` : '';
+  DIRS.forEach(d => { const el=$(CELL_ID[d]); el.classList.remove('hit'); el.classList.toggle('empty', !open); });
+  const c = $('center');
+  c.classList.toggle('empty', !open);
+  c.innerHTML = `<b>${layout}</b><span>${['root','group','character'][path.length] || ''}</span>`;
+  if(!open) return;
+  DIRS.forEach((d, idx) => {
+    const el = $(CELL_ID[d]);
+    let html = `<div class="arrow">${ARROW[d]}</div>`;
+    if(path.length === 0){
+      html += `<div class="small">${LAYOUTS[layout][idx].map((g,gi)=>{ const a=group(idx,gi); return a.some(x=>chars(x).length>1) ? escapeHtml(a[0])+'…' : a.join(''); }).join('<br>')}</div>`;
+    } else if(path.length === 1){
+      const q = DIRS.indexOf(path[0]);
+      const g2=group(q,idx); html += `<div class="mid${g2.some(x=>chars(x).length>1)?' long':''}">${g2.map(escapeHtml).join(' ')}</div>`;
+    } else {
+      const q = DIRS.indexOf(path[0]), g = DIRS.indexOf(path[1]);
+      const v = leaf(q,g,idx);
+      html += `<div class="big${chars(v).length>1?' long':''}">${escapeHtml(v)}</div>`;
+    }
+    el.innerHTML = html;
+  });
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function flash(d){ const el=$(CELL_ID[d]); el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),150); }
+
+// ---------- actions ----------
+function pressDir(d){
+  if(!open) return;
+  flash(d);
+  path.push(d);
+  if(path.length === 3){
+    const v = leaf(DIRS.indexOf(path[0]), DIRS.indexOf(path[1]), DIRS.indexOf(path[2]));
+    text += v;
+    log(`Typed: <b>${escapeHtml(v)}</b> (${path.map(x=>ARROW[x]).join('')})`);
+    path = [];
+  }
+  render();
+}
+function backShort(){
+  if(!open) return;
+  if(path.length){ path.pop(); }
+  else if(text){ text = chars(text).slice(0,-1).join(''); }
+  else { open = false; log('Keyboard closed (back on an empty field).'); }
+  render();
+}
+function backRepeat(){
+  if(!open) return;
+  if(path.length) path = []; else text = chars(text).slice(0,-1).join('');
+  render();
+}
+function okShort(){
+  if(!open){ open = true; path = []; log('Keyboard opened.'); }
+  else if(path.length === 0){ text += ' '; log('Space typed.'); }
+  render();
+}
+function okLong(){
+  if(!open) return;
+  open = false; path = [];
+  log(`<b>Done:</b> “${escapeHtml(text)}”`);
+  render();
+}
+function menuLong(){
+  if(!open || pickerIdx !== null) return;
+  pickerIdx = NAMES.indexOf(layout); renderPicker();
+}
+function home(){
+  if(pickerIdx !== null){ pickerIdx = null; renderPicker(); }
+  if(open){ open = false; path = []; text = ''; log('Home: keyboard closed, input discarded.'); render(); }
+}
+function renderPicker(){
+  $('overlay').classList.toggle('show', pickerIdx !== null);
+  if(pickerIdx === null) return;
+  $('picker').innerHTML = '<h2>Layout</h2>' + NAMES.map((n,i)=>`<div class="opt ${i===pickerIdx?'sel':''}">${n}</div>`).join('');
+}
+function pickerKey(code){
+  if(code==='ArrowUp') pickerIdx = (pickerIdx + NAMES.length - 1) % NAMES.length;
+  else if(code==='ArrowDown') pickerIdx = (pickerIdx + 1) % NAMES.length;
+  else if(code==='Enter'){ layout = NAMES[pickerIdx]; path = []; pickerIdx = null; log(`Layout: <b>${layout}</b>`); render(); }
+  else if(code==='Backspace') pickerIdx = null;
+  renderPicker();
+}
+
+// ---------- keyboard input: short / long presses ----------
+const LONG_MS = 700, RING_MS = 200;
+const KEYMAP = { ArrowUp:'up', ArrowRight:'right', ArrowDown:'down', ArrowLeft:'left', Enter:'ok', Backspace:'back', KeyM:'menu', Escape:'home' };
+const CHIPS = [['←','ArrowLeft'],['↑','ArrowUp'],['↓','ArrowDown'],['→','ArrowRight'],['OK · Enter','Enter'],['Back · Backspace','Backspace'],['Menu · M','KeyM'],['Home · Esc','Escape']];
+$('keys').innerHTML = CHIPS.map(([t,c])=>`<div class="chip" data-code="${c}"><span>${t}</span></div>`).join('');
+const chip = code => document.querySelector(`.chip[data-code="${code}"]`);
+
+const held = {}; // code -> {fired, t1, t2, iv}
+function press(code){
+  const action = KEYMAP[code];
+  if(!action || held[code]) return;
+  const ch = chip(code); ch.classList.add('down');
+  if(pickerIdx !== null){ pickerKey(code); held[code] = {fired:true}; return; }
+  if(action==='home'){ home(); held[code] = {fired:true}; return; }
+  if(['up','right','down','left'].includes(action)){ pressDir(action); held[code] = {fired:true}; return; }
+  const h = held[code] = { fired:false };
+  h.t1 = setTimeout(()=>ch.classList.add('hold'), RING_MS);
+  h.t2 = setTimeout(()=>{
+    h.fired = true;
+    if(action==='ok') okLong();
+    else if(action==='menu') menuLong();
+    else if(action==='back'){ backRepeat(); h.iv = setInterval(backRepeat, 80); }
+  }, LONG_MS);
+}
+function release(code){
+  const action = KEYMAP[code];
+  if(!action) return;
+  chip(code).classList.remove('down','hold');
+  const h = held[code];
+  if(!h) return;
+  clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv);
+  delete held[code];
+  if(h.fired) return;
+  if(action==='ok') okShort();
+  else if(action==='back') backShort();
+  else if(action==='menu' && open){
+    layout = NAMES[(NAMES.indexOf(layout) + 1) % NAMES.length];
+    path = [];
+    log(`Layout: <b>${layout}</b>`);
+    render();
+  }
+}
+// physical keyboard
+addEventListener('keydown', e => {
+  if(!KEYMAP[e.code]) return;
+  e.preventDefault();
+  if(e.repeat) return;
+  press(e.code);
+});
+addEventListener('keyup', e => { if(KEYMAP[e.code]) release(e.code); });
+// touch / mouse: the on-screen remote buttons and the four sectors
+function bindPointer(el, code){
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture && el.setPointerCapture(e.pointerId); press(code); });
+  const end = e => { e.preventDefault(); release(code); };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+document.querySelectorAll('.chip').forEach(el => bindPointer(el, el.dataset.code));
+Object.entries({u:'ArrowUp', r:'ArrowRight', d:'ArrowDown', l:'ArrowLeft'}).forEach(([id,code]) => bindPointer($(id), code));
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('blur', () => {
+  Object.values(held).forEach(h=>{ clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv); });
+  for(const k in held) delete held[k];
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('down','hold'));
+});
+
+render();
+log('Press <b>Enter</b> to open the keyboard.');
+</script>
+</body>
+</html>
