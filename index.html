@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radial D-pad keyboard</title>
+<title>Radial D-pad keyboard: commands + suggestions</title>
 <style>
   :root { --bg:#12141a; --panel:#1b1f29; --fg:#e8eaf0; --dim:#8a91a3; --acc:#5aa2ff; --line:#2a3040; }
   * { box-sizing: border-box; }
@@ -11,8 +11,11 @@
          display:flex; flex-direction:column; align-items:center; padding:24px 16px; gap:18px; }
   h1 { font-size:18px; font-weight:600; margin:0; color:var(--dim); }
   #field { width:min(640px,100%); min-height:64px; background:var(--panel); border:2px solid var(--line);
-           border-radius:12px; padding:14px 18px; font-size:28px; word-break:break-all; }
+           border-radius:12px; padding:14px 18px; font-size:28px; word-break:break-all; white-space:pre-wrap; }
   #field.active { border-color:var(--acc); }
+  #field.priv { border-color:#f5a524; }
+  .chip.on { background:rgba(245,165,36,.22); border-color:#f5a524; color:var(--fg); }
+  #field .caret.cm { animation:none; width:5px; background:#f5a524; }
   #field .caret { display:inline-block; width:2px; height:1em; background:var(--acc); vertical-align:-0.12em; animation:blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity:0; } }
   #path { color:var(--dim); font-size:15px; height:20px; }
@@ -62,7 +65,10 @@
   #fx { width:100%; height:100%; display:block; touch-action:none; }
   #fx text { fill:var(--fg); font-family:system-ui,sans-serif; pointer-events:none; user-select:none; }
   #fx .sec { fill:var(--panel); stroke:var(--bg); stroke-width:1.5; }
+  #fx .cmd { fill:#1c2a30; }
   #fx .anc { fill:#27406b; }
+  #fx .ic { fill:none; stroke:var(--fg); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  #fx .ic.dimtxt { stroke:var(--dim); }
   #fx .dim { fill:#171a22; }
   #fx .sel { stroke:var(--acc); stroke-width:2; cursor:pointer; fill:#222a3a; }
   #fx .arrow { fill:var(--acc); }
@@ -71,17 +77,21 @@
 </style>
 </head>
 <body>
-<h1>Radial D-pad keyboard · interactive prototype</h1>
+<h1>Radial D-pad keyboard · v2: command sector + word suggestions</h1>
 <div id="field"></div>
 <div id="path"></div>
 <div id="wheel"><svg id="fx" viewBox="-250 -250 500 500" xmlns="http://www.w3.org/2000/svg"></svg></div>
 <div id="keys"></div>
 <div id="log"></div>
 <div class="note">
-  <p><b>Idea:</b> text entry with only the four arrow keys of a TV remote. Every character is a 4×4×4 tree, drawn as three concentric rings (4 sectors → 16 groups → 64 characters) with a fisheye effect: each press blows up the chosen sector so its four children sit on the four arrow directions. the first press picks one of 4 sectors, the second one of 4 groups, the third one of 4 characters. Exactly 3 presses per character, no OK needed to select, no timeouts, learnable blind.</p>
+  <p><b>Idea:</b> text entry with only the four arrow keys of a TV remote. Every character is a 4×4×4 tree, drawn as three concentric rings (4 sectors → 16 groups → 64 slots) with a fisheye effect: each press blows up the chosen sector so its four children sit on the four arrow directions. Exactly 3 presses per slot, no OK needed to select, no timeouts, learnable blind.</p>
+  <p><b>New in v2:</b> the <b>bottom sector (↓) is a command sector, identical in every layout</b>, tinted teal. Letters live in the other three sectors; most symbols and digits moved to the Symbols layout. Inside the command sector: <code>↓ ↓</code> = <b>4 word suggestions</b> (best one on <code>↓ ↓ ↓</code>; accepting also adds a space), <code>↓ →</code> = <b>cursor</b> (<code>↓ → ↓</code> enters cursor mode; <code>↓ → →</code> / <code>↓ → ←</code> jump a word right / left; <code>↓ → ↑</code> new line), <code>↓ ←</code> = <b>edit</b> (undo, shift, clear field, delete word), <code>↓ ↑</code> = the most common punctuation <code>. , ? !</code>. In cursor mode the arrows move the cursor (← → one character, ↑ start, ↓ end); OK or Back leaves it. Capital letters are automatic at the start of the field and after <code>. ! ?</code>; Shift makes the next letter a capital and shows the capitals on the wheel; <b>hold the shift slot</b> (its sector fills up, 1.5 s) for caps lock, and the slot then turns into a “leave caps lock” button.</p>
+  <p><b>Voice</b> (button below or <code>V</code>) emulates the mic button of a remote: the sectors slide in behind the centre, a microphone appears and the page listens (it uses the browser's speech recognition when available, otherwise it types a demo phrase). <code>OK</code> inserts what was heard, any other key cancels.</p>
+  <p><b>Private input</b> (button below or <code>P</code>) simulates a password field: suggestions are switched off (the slots show a lock), nothing is learned, there are no automatic capitals, and typed characters appear as dots (the last one is visible for about a second). In a real build the host app would set this per field.</p>
+  <p>Suggestions come from a small built-in English/Russian word list plus words you finish typing (kept only in this page's memory, nothing is sent anywhere). In a real build the source would be pluggable (e.g. the titles in a media library) and switched off for password fields.</p>
   <p>Use your keyboard to emulate a remote: <code>↑ ↓ ← →</code> choose a sector. <code>Enter</code> (OK): short press (under 0.4 s) in the root = space, long press (1.5 s, a green ring grows in the centre) = confirm. <code>Backspace</code> (Back): erase a character / go up one level; hold 1.5 s (red ring) to auto-repeat erase; on an empty field it closes the keyboard. <code>M</code> (Menu): short = next layout (carousel), long = zoom out to see all layouts (←/→ browse, Enter pick, Backspace cancel). <code>Esc</code> (Home): close and discard.</p>
-  <p><b>On a phone / with a mouse:</b> tap the four sectors for the arrows, and use the OK / Back / Menu / Home buttons below. Press and hold works the same as on a keyboard (the button fills while you hold).</p>
-  <p>Feedback welcome: how does it feel after a minute of typing? Is the long-press logic sensible on a real remote? Would you group letters differently (e.g. by frequency instead of alphabetically)?</p>
+  <p><b>On a phone / with a mouse:</b> tap the four sectors for the arrows, and use the OK / Back / Menu / Home buttons below. Press and hold works the same as on a keyboard.</p>
+  <p>Feedback welcome: is a dedicated command sector a good use of a quarter of the wheel? Is cursor mode (3 presses to enter, then 1 per step) acceptable? Do suggestions pay off at 3 presses each?</p>
 </div>
 <div id="overlay"><div id="picker"></div></div>
 
@@ -89,35 +99,107 @@
 // ---------- layouts: 4 quadrants (up, right, down, left) × 4 groups × 4 leaves ----------
 const LAYOUTS = {
   'Russian': [
-    ['абвг','дежз','ийкл',['ё','(',')',"'"]],
-    ['мноп','рсту','фхцч','шщъы'],
-    ['ьэюя','0123','4567',['8','9','.',',']],
-    [['-','_','@','/'],[':','?','!','&'],['#','+','=','%'],['https://','www.','.com','.ru']],
+    ['абвг','дежз','ийкл','мноп'],
+    ['рсту','фхцч','шщъы','ьэюя'],
+    null,                                   // quadrant 2 (down) = command sector, same in every layout
+    [['ё',"'",'-',':'],[';','"','(',')'],['@','_','&','/'],['https://','www.','.com','.ru']],
   ],
   'English': [
     ['abcd','efgh','ijkl','mnop'],
-    ['qrst','uvwx',['y','z','.','-'],['_','@','/',':']],
-    ['0123','4567',['8','9',',','?'],['!','&','#','+']],
-    [['=','%','(',')'],["'",'"','*','~'],['№',';','<','>'],['https://','www.','.com','.ru']],
+    ['qrst','uvwx',['y','z',"'",'-'],[';','"','=','+']],
+    null,
+    [['(',')','@','_'],['&','#','/',':'],['https://','www.','.com','.ru'],['.org','.net','.io','.tv']],
   ],
   'Symbols': [
-    ['0123','4567',['8','9','.',','],['-','_','@','/']],
-    [[':','?','!','&'],['#','+','=','%'],['(',')',"'",'"'],['*','~','№',';']],
-    [['<','>','[',']'],['{','}','|','\\'],['$','€','£','¥'],['^','`','°','±']],
-    [['https://','www.','.com','.ru'],['.org','.net','.io','.tv'],['ё','Ё','é','ü'],['«','»','—','…']],
+    ['0123','4567',['8','9','+','-'],['*','/','=','%']],
+    [[':',';','"',"'"],['(',')','[',']'],['@','#','&','_'],['https://','www.','.com','.ru']],
+    null,
+    [['{','}','<','>'],['$','€','£','¥'],['|','\\','~','^'],['«','»','—','…']],
   ],
 };
+// Command sector. Leaf order inside a group is by index k; comments give the arrow path from the root.
+const CMD = {
+  wordL:{l:'\u0001wordL'}, wordR:{l:'\u0001wordR'}, cursor:{l:'\u0001cursor'}, newline:{l:'\u0001newline'},
+  undo:{l:'\u0001undo'}, shift:{l:'\u0001shift'}, capsOff:{l:'\u0001capsOff'}, clear:{l:'\u0001clear'}, delWord:{l:'\u0001delWord'},
+};
+// One-colour line icons (24×24 grid), drawn as SVG so they look the same on every device.
+const BACKSP = '<path d="M9 5h11v14H9l-6-7z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>';
+const ICONS = {
+  wordL:'<path d="M12 6l-6 6 6 6M19 6l-6 6 6 6"/>',
+  wordR:'<path d="M12 6l6 6-6 6M5 6l6 6-6 6"/>',
+  cursor:'<path d="M12 4v16M8.5 4h7M8.5 20h7"/>',
+  newline:'<path d="M20 5v6a2 2 0 0 1-2 2H5M9 9l-4 4 4 4"/>',
+  undo:'<path d="M9 4L4 9l5 5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H10"/>',
+  shift:'<path d="M12 4l8 9h-5v7H9v-7H4z"/>',
+  capsOff:'<path d="M12 4l8 9h-5v7H9v-7H4z" style="fill:var(--fg)"/><path d="M3 3l18 18" style="stroke:var(--panel);stroke-width:6"/><path d="M3 3l18 18"/>',
+  clear:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/>',
+  delWord:BACKSP + '<path d="M3 22h18"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  edit:'<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
+  start:'<path d="M5 5v14M19 12H9M13 8l-4 4 4 4"/>',
+  end:'<path d="M19 5v14M5 12h10M11 8l4 4-4 4"/>',
+  left:'<path d="M14 6l-6 6 6 6"/>',
+  right:'<path d="M10 6l6 6-6 6"/>',
+};
+const CMD_GROUPS = [
+  [{cmd:'newline'},{cmd:'wordR'},{cmd:'cursor'},{cmd:'wordL'}],         // ↓ →  + (↑ → ↓ ←)
+  [{sug:2},{sug:0},{sug:3},{sug:1}],                                    // ↓ ↓  + (→ ↓ ← ↑): best suggestion = ↓ ↓ ↓
+  [{cmd:'delWord'},{cmd:'undo'},{cmd:'shift'},{cmd:'clear'}],           // ↓ ←  + (↓ ← ↑ →)
+  [',','!','.','?'],                                                    // ↓ ↑  + (← ↑ → ↓)
+];
 const NAMES = ['English','Russian','Symbols'];
 const DIRS = ['up','right','down','left'];
 const ARROW = {up:'↑',right:'→',down:'↓',left:'←'};
 const CELL_ID = {up:'u',right:'r',down:'d',left:'l'};
 
 // ---------- state ----------
-let text = '', open = false, layout = NAMES[0], path = [], pickerIdx = null;
+let open = false, layout = NAMES[0], path = [], pickerIdx = null;
 const $ = id => document.getElementById(id);
 const chars = s => Array.from(s);
-const leaf = (q,g,i) => { const grp = LAYOUTS[layout][q][g]; return typeof grp === 'string' ? chars(grp)[i] : grp[i]; };
-const group = (q,g) => { const grp = LAYOUTS[layout][q][g]; return typeof grp === 'string' ? chars(grp) : grp; };
+const group = (q,g) => {
+  let grp = q===2 ? CMD_GROUPS[g] : LAYOUTS[layout][q][g];
+  if(typeof grp === 'string') return chars(grp);
+  if(q===2 && capsLock) grp = grp.map(it => it.cmd === 'shift' ? {cmd:'capsOff'} : it);   // the shift slot becomes "leave caps lock"
+  return grp;
+};
+const leaf = (q,g,i) => group(q,g)[i];
+// ---- text buffer with a cursor, suggestions, shift ----
+let voiceMode = false, voiceT = 0, voiceTarget = 0, voiceInterim = '', voiceFinal = '', voiceRec = null, voiceTimers = [];
+let capsLock = false, leafHoldDir = -1, leafProg = 0, leafRaf = 0, leafStart = 0;
+let privateMode = false, revealIdx = -1, revealUntil = 0;
+let buf = [], cur = 0, hist = [], shiftOnce = false, curMode = false, autoCap = true, capOn = true, prefix = '', sugs = [];
+const learned = new Map();
+const W = (a,b) => [...new Set(a.split(/\s+/).filter(Boolean))];
+const DICT_EN = W(`the be to of and a in that have i it for not on with he as you do at this but his by from they we say her she or an will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us is was are were been has had did said each tell does set three need large must big high such follow act why ask men change went light kind off need house picture try again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run dont while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second book carry took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special mind behind clear tail produce fact street inch multiply nothing course stay wheel full force blue object decide surface deep moon island foot system busy test record boat common gold possible plane stead dry wonder laugh thousand ago ran check game shape equate hot miss brought heat snow tire bring yes distant fill east paint language among movie movies series show shows season episode watch watching search settings network wifi volume subtitles language netflix youtube hello please thanks thank password username email home play pause stop next previous download update install apps application recent popular trending favorites library kids cartoon documentary comedy drama action horror thriller music radio news sports weather`);
+const DICT_RU = W(`и в не на я быть он с что а по это она этот к но они мы как из у который то за свой что ее так же от только о его для мне ты все еще бы себя уже до вот когда если там или ни быть может говорить даже нет ну вы да чем два один после время сам теперь потом чтобы тут где есть надо ней них тоже сказать два год другой человек такой его их весь день жизнь дело раз рука очень без через под над при про между более всего всегда сейчас здесь можно нужно хочу хотел знаю знать делать сделать видеть смотреть привет пока спасибо пожалуйста здравствуйте добрый хорошо плохо очень много мало большой маленький новый старый первый последний каждый любой какой такой самый ничего что-то кто-то никто ничто никогда иногда часто скоро сегодня вчера завтра утро вечер ночь неделя месяц работа дом город страна мир друг слово вопрос ответ голова глаза лицо земля вода дорога голос история правда время место сторона случай конец вид часть дверь стол машина семья ребенок женщина мужчина отец мать сын дочь брат сестра муж жена имя ночью утром вечером можешь можете буду будет были было была были будем будут знаете понимаю думаю считаю нравится люблю спросить позвонить писать читать говорить слушать играть работать жить идти ехать лететь ждать найти искать получить дать взять принести показать открыть закрыть включить выключить фильм фильмы сериал сериалы мультфильм мультфильмы передача передачи сезон серия серии смотреть смотрю поиск искать найти настройки настройка сеть вайфай громкость звук субтитры язык пароль логин почта главная назад вперед пауза играть стоп следующий предыдущий загрузить обновить установить приложение приложения недавние популярные избранное библиотека детям комедия драма боевик ужасы триллер музыка радио новости спорт погода ютуб нетфликс кино кинотеатр телевизор пульт экран картинка изображение яркость контраст`);
+function isW(c){ return /[\p{L}\p{N}']/u.test(c); }
+function snap(){ hist.push([buf.slice(), cur]); if(hist.length > 100) hist.shift(); }
+function ins(str){ snap(); const a = chars(str); buf.splice(cur, 0, ...a); cur += a.length; }
+function learn(w){ if(privateMode) return; w = w.toLowerCase(); if(chars(w).length >= 3) learned.set(w, (learned.get(w)||0) + 1); }
+function suggest(p){
+  const lo = p.toLowerCase(), cyr = /\p{Script=Cyrillic}/u.test(lo), list = cyr ? DICT_RU : DICT_EN, score = new Map();
+  list.forEach((w,i) => { if(w.startsWith(lo) && w !== lo) score.set(w, 1/(i+20)); });
+  learned.forEach((c,w) => { if(w.startsWith(lo) && w !== lo && /\p{Script=Cyrillic}/u.test(w) === cyr) score.set(w, (score.get(w)||0) + 0.02*c + 0.01); });
+  let r = [...score.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
+  const pc = chars(p);
+  if(pc.length > 1 && p === p.toUpperCase()) r = r.map(w => w.toUpperCase());
+  else if(pc[0] !== pc[0].toLowerCase()) r = r.map(w => { const c = chars(w); return c[0].toUpperCase() + c.slice(1).join(''); });
+  return r;
+}
+function calc(){
+  const before = buf.slice(0, cur).join('');
+  autoCap = !privateMode && (before === '' || /[.!?]\s+$/.test(before) || /\n$/.test(before));
+  capOn = autoCap || shiftOnce || capsLock;
+  const m = before.match(/[\p{L}']+$/u);
+  prefix = m ? m[0] : '';
+  sugs = (prefix && !privateMode) ? suggest(prefix) : [];
+}
+function itemLabel(it){
+  if(typeof it === 'string') return ((shiftOnce || capsLock) && chars(it).length === 1) ? it.toUpperCase() : it;
+  if(it.sug !== undefined) return privateMode ? '\u0001lock' : (sugs[it.sug] || '·');
+  return CMD[it.cmd].l;
+}
 
 function log(html){ $('log').innerHTML = html; }
 
@@ -154,7 +236,9 @@ function arc(r0, r1, a0, a1){
   const big = (a1-a0) > 180 ? 1 : 0;
   return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r1} ${r1} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}A${r0} ${r0} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z`;
 }
-function groupLabel(q,g){ const a = group(q,g); return a.some(x=>chars(x).length>1) ? a[0]+'…' : a.join(''); }
+function groupLabel(q,g){
+  if(q===2) return g===0 ? '\u0001cursor' : g===1 ? (privateMode ? '\u0001lock' : sugs[0] ? sugs[0]+'…' : '···') : g===2 ? '\u0001edit' : '. , ? !';
+  const a = group(q,g); return a.some(x=>chars(x).length>1) ? itemLabel(a[0])+'…' : a.map(itemLabel).join(''); }
 
 function wheelCore(){
   const RS = resolve(path);
@@ -168,6 +252,12 @@ function wheelCore(){
   let out = '';
   const label = (txt, r, a0, a1, size, cls, ring) => {
     const w = (a1-a0)*Math.PI/180*r;
+    if(txt[0] === '\u0001'){
+      const is = Math.min(size*0.95, w/1.3);
+      if(is < 9) return '';
+      const [ix,iy] = pt(r,(a0+a1)/2), k = is/24;
+      return `<g class="ic ${cls}" transform="translate(${(ix-12*k).toFixed(1)},${(iy-12*k).toFixed(1)}) scale(${k.toFixed(3)})">${ICONS[txt.slice(1)]}</g>`;
+    }
     const fs = Math.min(size, w/(Math.max(1,chars(txt).length)*0.62));
     if(fs < 7.5) return '';
     const [x,y] = pt(r,(a0+a1)/2);
@@ -184,9 +274,11 @@ function wheelCore(){
   const sector = (ring, idx, a0, a1, txt, dirIdx) => {
     if(a1-a0 < 0.05) return '';
     const sel = open && !noSel && ring===selRing && dirIdx !== null;
-    let cls = 'sec' + (isAnc(ring,idx) ? ' anc' : (!focusOf(ring,idx) ? ' dim' : '')) + (sel ? ' sel' : '');
+    const qOf = ring==='q' ? idx : ring==='g' ? idx>>2 : idx>>4;
+    let cls = 'sec' + (qOf===2 ? ' cmd' : '') + (isAnc(ring,idx) ? ' anc' : (!focusOf(ring,idx) ? ' dim' : '')) + (sel ? ' sel' : '');
     const [r0,r1] = RING[ring];
     let h = `<path class="${cls}" d="${arc(r0,r1,a0,a1)}"${sel ? ` data-dir="${DIRS[dirIdx]}"` : ''}/>`;
+    if(ring==='l' && sel && dirIdx === leafHoldDir && leafProg > 0) h += `<path d="${arc(r0, r0+(r1-r0)*leafProg, a0, a1)}" fill="#6e56cf" style="pointer-events:none"/>`;
     const rm = (r0+r1)/2;
     if(sel){
       const w = (a1-a0)*Math.PI/180*rm;
@@ -211,27 +303,45 @@ function wheelCore(){
   for(let i=0;i<64;i++){
     const q=i>>4, g=(i>>2)&3, k=i&3;
     const dirIdx = path.length===2 && (i>>2)===(qi()*4+gi()) ? (k+RS.ms[2])%4 : null;
-    out += sector('l', i, A(i), A(i+1), leaf(q,g,k), dirIdx);
+    out += sector('l', i, A(i), A(i+1), itemLabel(leaf(q,g,k)), dirIdx);
   }
-  out += `<circle class="hub" r="54"/>`;
+  if(curMode){
+    out += `<circle r="250" fill="var(--bg)" opacity=".94"/>`;
+    [['up',-135,-45,'\u0001start'],['right',-45,45,'\u0001right'],['down',45,135,'\u0001end'],['left',135,225,'\u0001left']].forEach(([d,a0,a1,t]) => {
+      out += `<path class="sec sel" d="${arc(58,246,a0,a1)}" data-dir="${d}"/>`;
+      out += label(ARROW[d], 70, a0, a1, 15, 'arrow').replace('<text','<text class="arrow"').replace('class="arrow" class="arrow"','class="arrow"');
+      out += label(t, 150, a0, a1, 72, '');
+    });
+  }
+  if(voiceT > 0.001) out = voiceT > 0.97 ? '' : `<g transform="scale(${(1-voiceT).toFixed(3)})">${out}</g>`;   // sectors slide in behind the centre
+  out += `<circle class="hub" r="${(54 + 26*voiceT).toFixed(1)}"${voiceT > 0.5 ? ' style="stroke:var(--acc);stroke-dasharray:none;stroke-width:2" data-mic="1"' : ''}/>`;
   if(holdProg > 0){ const rr = 6 + 48*holdProg; out += `<circle r="${rr.toFixed(1)}" fill="${holdColor}"/>`; }
+  const hubState = () => !open ? 'closed' : curMode ? 'cursor' : ['root','group','slot'][path.length] + (capsLock ? ' · CAPS' : capOn ? ' ⇧' : '') + (privateMode ? ' · private' : '');
   const hubTxt = (fill, extra) => `<g ${extra}><text x="0" y="-8" text-anchor="middle" font-size="17" font-weight="600" style="fill:${fill}">${layout}</text>` +
-    `<text x="0" y="14" text-anchor="middle" font-size="12" style="fill:${fill}">${open ? ['root','group','character'][path.length] : 'closed'}</text></g>`;
-  out += hubTxt('var(--fg)', '');
+    `<text x="0" y="14" text-anchor="middle" font-size="12" style="fill:${fill}">${hubState()}</text></g>`;
+  if(voiceT < 0.5) out += hubTxt('var(--fg)', '');
   if(holdProg > 0){   // same text again in dark ink, revealed only where the green disc covers it (mask effect)
     const rr = 6 + 48*holdProg;
     out += `<clipPath id="hubclip"><circle r="${rr.toFixed(1)}"/></clipPath>` + hubTxt(holdInk, 'clip-path="url(#hubclip)"');
+  }
+  if(voiceT > 0.3){
+    const o = Math.min(1, (voiceT-0.3)/0.7), ph = (performance.now() % 1800) / 1800;
+    for(const d of [0, 0.5]){ const q = (ph + d) % 1; out += `<circle r="${(82 + q*70).toFixed(1)}" fill="none" stroke="var(--acc)" stroke-width="2" opacity="${((1-q)*0.55*o).toFixed(2)}"/>`; }
+    out += `<g class="ic" opacity="${(o*o).toFixed(2)}" transform="translate(-30,-30) scale(2.5)">${ICONS.mic}</g>`;
+    const cap = voiceInterim ? (privateMode ? '•'.repeat(Math.min(24, chars(voiceInterim).length)) : (chars(voiceInterim).length > 26 ? '…' + chars(voiceInterim).slice(-25).join('') : voiceInterim)) : '';
+    out += `<text x="0" y="150" text-anchor="middle" font-size="22" style="fill:var(--fg);opacity:${o.toFixed(2)}">${escapeHtml(cap) || 'Listening…'}</text>`;
+    out += `<text x="0" y="182" text-anchor="middle" font-size="14" style="fill:var(--dim);opacity:${o.toFixed(2)}">OK = done · any other key = cancel</text>`;
   }
   return out;
 }
 let noSel = false;
 function wheelSvg(name, live){
-  const sv = { path, wcur, Ocur, holdProg, layout };
-  if(!live){ path = []; wcur = new Array(64).fill(1); Ocur = -135; holdProg = 0; }
+  const sv = { path, wcur, Ocur, holdProg, layout, curMode, voiceT };
+  if(!live){ path = []; wcur = new Array(64).fill(1); Ocur = -135; holdProg = 0; curMode = false; voiceT = 0; }
   layout = name;
   noSel = !live || pickerIdx !== null;
   const out = wheelCore();
-  ({ path, wcur, Ocur, holdProg, layout } = sv);
+  ({ path, wcur, Ocur, holdProg, layout, curMode, voiceT } = sv);
   return out;
 }
 // ---- carousel camera: wheels sit on an endless ring; camPos = which one is centred, camS = zoom (1 = one wheel, 0.3 = all three) ----
@@ -299,57 +409,103 @@ function tick(t){
   Ocur = Sa - cumOf(wcur)[anchorF0];
   if(Math.abs(camTarget-camPos) > 0.002){ camPos += (camTarget-camPos)*0.16; moving = true; } else camPos = camTarget;
   if(Math.abs(camSTarget-camS) > 0.002){ camS += (camSTarget-camS)*0.16; moving = true; } else camS = camSTarget;
+  if(Math.abs(voiceTarget-voiceT) > 0.002){ voiceT += (voiceTarget-voiceT)*0.13; moving = true; } else voiceT = voiceTarget;
+  if(voiceMode) moving = true;
   draw();
   if(!moving) lastT = 0;
   raf = moving ? requestAnimationFrame(tick) : 0;
 }
 function render(){
+  calc();
   const f = $('field');
-  f.className = open ? 'active' : '';
-  f.innerHTML = (text ? escapeHtml(text) : '') + (open ? '<span class="caret"></span>' : (text ? '' : '<span style="color:var(--dim)">Press Enter to open the keyboard</span>'));
-  $('path').textContent = open ? `${layout}  ·  path: ${path.map(d=>ARROW[d]).join(' ') || '—'}` : '';
+  f.className = (open ? 'active' : '') + (privateMode ? ' priv' : '');
+  const shown = (arr, off) => privateMode ? arr.map((c,i) => (i+off === revealIdx && performance.now() < revealUntil) ? c : '•').join('') : arr.join('');
+  const L = escapeHtml(shown(buf.slice(0,cur), 0)), R = escapeHtml(shown(buf.slice(cur), cur));
+  const pc = document.querySelector('.chip[data-code="KeyP"]'); if(pc) pc.classList.toggle('on', privateMode);
+  f.innerHTML = L + (open ? `<span class="caret${curMode ? ' cm' : ''}"></span>` : '') + R + (!open && !buf.length ? '<span style="color:var(--dim)">Press Enter to open the keyboard</span>' : '');
+  $('path').textContent = open ? `${layout}  ·  ${curMode ? 'cursor mode: ← → char, ↑ start, ↓ end, OK/Back exit' : 'path: ' + (path.map(d=>ARROW[d]).join(' ') || '—')}${privateMode ? '  ·  private' : ''}` : '';
   if(!raf) raf = requestAnimationFrame(tick);
 }
 function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function flash(d){}
 
 // ---------- actions ----------
+function wordStart(){ let i = cur; while(i>0 && !isW(buf[i-1])) i--; while(i>0 && isW(buf[i-1])) i--; return i; }
+function wordEnd(){ let i = cur; while(i<buf.length && !isW(buf[i])) i++; while(i<buf.length && isW(buf[i])) i++; return i; }
+function acceptSug(i){
+  const w = sugs[i];
+  if(!w){ log(privateMode ? 'Private input: suggestions are off.' : 'No suggestion in that slot.'); return; }
+  snap(); const n = chars(prefix).length;
+  buf.splice(cur-n, n, ...chars(w + ' ')); cur += chars(w).length + 1 - n;
+  learn(w); shiftOnce = false;
+  log(`Suggestion accepted: <b>${escapeHtml(w)}</b>`);
+}
+function runItem(it, p){
+  if(typeof it === 'string'){
+    const v = (capOn && chars(it).length === 1) ? it.toUpperCase() : it;
+    if(!/^\p{L}/u.test(v) && prefix) learn(prefix);
+    ins(v); shiftOnce = false;
+    revealIdx = cur-1; revealUntil = performance.now() + 900; setTimeout(render, 950);
+    log(privateMode ? 'Typed a character (hidden).' : `Typed: <b>${escapeHtml(v)}</b> (${p})`); return;
+  }
+  if(it.sug !== undefined){ acceptSug(it.sug); return; }
+  switch(it.cmd){
+    case 'wordL': cur = wordStart(); log('Word left.'); break;
+    case 'wordR': cur = wordEnd(); log('Word right.'); break;
+    case 'cursor': curMode = true; log('Cursor mode: ← → one character, ↑ start, ↓ end. OK or Back to leave.'); break;
+    case 'newline': ins('\n'); log('New line.'); break;
+    case 'undo': if(hist.length){ [buf, cur] = hist.pop(); log('Undone.'); } else log('Nothing to undo.'); break;
+    case 'capsOff': capsLock = false; shiftOnce = false; log('Caps lock off.'); break;
+    case 'shift': shiftOnce = !shiftOnce; log(shiftOnce ? 'Shift on: the next letter will be a capital. (Hold this slot for caps lock.)' : 'Shift off.'); break;
+    case 'clear': if(buf.length){ snap(); buf = []; cur = 0; } log('Field cleared (undo is in the command sector).'); break;
+    case 'delWord': { const st = wordStart(); if(st < cur){ snap(); buf.splice(st, cur-st); cur = st; } log('Word deleted.'); break; }
+  }
+}
+function curMove(d){
+  if(d==='left') cur = Math.max(0, cur-1);
+  else if(d==='right') cur = Math.min(buf.length, cur+1);
+  else if(d==='up') cur = 0;
+  else cur = buf.length;
+  render();
+}
 function pressDir(d){
   if(!open) return;
-  flash(d);
+  if(curMode){ curMove(d); return; }
   path.push(d);
   if(path.length === 3){
-    const rs = resolve(path).sel; const v = leaf(rs[0], rs[1], rs[2]);
-    text += v;
-    log(`Typed: <b>${escapeHtml(v)}</b> (${path.map(x=>ARROW[x]).join('')})`);
+    const rs = resolve(path).sel, it = leaf(rs[0], rs[1], rs[2]), p = path.map(x=>ARROW[x]).join('');
     path = [];
+    runItem(it, p);
   }
   render();
 }
 function backShort(){
   if(!open) return;
-  if(path.length){ path.pop(); }
-  else if(text){ text = chars(text).slice(0,-1).join(''); }
-  else { open = false; log('Keyboard closed (back on an empty field).'); }
+  if(curMode){ curMode = false; log('Cursor mode off.'); }
+  else if(path.length){ path.pop(); }
+  else if(cur > 0){ snap(); buf.splice(cur-1, 1); cur--; }
+  else if(!buf.length){ open = false; log('Keyboard closed (back on an empty field).'); }
   render();
 }
 function backRepeat(){
   if(!open) return;
-  if(path.length) path = []; else text = chars(text).slice(0,-1).join('');
+  if(curMode){ curMode = false; render(); return; }
+  if(path.length) path = []; else if(cur > 0){ buf.splice(cur-1, 1); cur--; }
   render();
 }
 function okShort(){
-  if(!open){ open = true; path = []; log('Keyboard opened.'); }
-  else if(path.length === 0){ text += ' '; log('Space typed.'); }
+  if(!open){ open = true; path = []; cur = buf.length; log('Keyboard opened.'); }
+  else if(curMode){ curMode = false; log('Cursor mode off.'); }
+  else if(path.length === 0){ if(prefix) learn(prefix); ins(' '); shiftOnce = false; log('Space typed.'); }
   render();
 }
 function okLong(){
   if(!open) return;
-  open = false; path = [];
-  log(`<b>Done:</b> “${escapeHtml(text)}”`);
+  open = false; path = []; curMode = false; capsLock = false;
+  log(`<b>Done:</b> “${privateMode ? '•'.repeat(buf.length) : escapeHtml(buf.join(''))}”`);
   render();
 }
-function resetWheelState(){ path = []; prevPath = []; wcur = new Array(64).fill(1); Sa = Sat = Ocur = -135; anchorF0 = 0; }
+function resetWheelState(){ curMode = false; path = []; prevPath = []; wcur = new Array(64).fill(1); Sa = Sat = Ocur = -135; anchorF0 = 0; }
 function switchLayout(dir){                      // short Menu: next layout slides in like an endless carousel
   resetWheelState();
   layout = NAMES[(NAMES.indexOf(layout) + dir + NAMES.length) % NAMES.length];
@@ -363,9 +519,71 @@ function menuLong(){                             // long Menu: camera pulls back
   log('Choose a layout: ←/→ to browse, OK to pick, Back to cancel.'); render();
 }
 function closeOverview(){ pickerIdx = null; camSTarget = 1; render(); }
+// ---- voice input: emulates the voice-search (mic) button of a remote. Uses the browser's speech recognition when it exists, otherwise a demo phrase. ----
+function voiceDemo(msg){
+  voiceTimers.forEach(clearTimeout); voiceTimers = [];
+  const ph = layout === 'Russian' ? ['привет', 'привет мир'] : ['hello', 'hello world'];
+  if(msg) log(msg);
+  voiceTimers.push(setTimeout(()=>{ voiceInterim = ph[0]; }, 1100), setTimeout(()=>{ voiceInterim = ph[1]; }, 1900), setTimeout(()=>voiceFinish(), 2700));
+}
+function startVoice(){
+  if(voiceMode) return;
+  if(pickerIdx !== null){ camTarget = ovOrig; closeOverview(); }
+  open = true; path = []; curMode = false; voiceMode = true; voiceTarget = 1; voiceInterim = ''; voiceFinal = '';
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let started = false;
+  if(SR){
+    try{
+      const r = voiceRec = new SR();
+      r.lang = layout === 'Russian' ? 'ru-RU' : 'en-US'; r.interimResults = true; r.continuous = false;
+      r.onresult = e => {
+        let fin = '', part = '';
+        for(let i = e.resultIndex; i < e.results.length; i++){ const x = e.results[i]; if(x.isFinal) fin += x[0].transcript; else part += x[0].transcript; }
+        if(fin){ voiceFinal += fin; voiceInterim = voiceFinal; } else if(part) voiceInterim = voiceFinal + part;
+      };
+      r.onerror = e => { if(voiceRec !== r) return; voiceRec = null;
+        if(e.error === 'no-speech' || e.error === 'aborted'){ voiceCancel('No speech heard.'); } else voiceDemo(`Speech recognition unavailable here (${e.error}); using a demo phrase.`); };
+      r.onend = () => { if(voiceRec === r){ voiceRec = null; voiceFinish(); } };
+      r.start(); started = true;
+    }catch(err){ voiceRec = null; }
+  }
+  if(started) log('Listening… OK = done, any other key = cancel.');
+  else voiceDemo('Speech recognition is not available in this browser; using a demo phrase.');
+  render();
+}
+function voiceStopRec(abort){ const r = voiceRec; voiceRec = null; if(r){ r.onend = r.onerror = r.onresult = null; try{ abort ? r.abort() : r.stop(); }catch(e){} } voiceTimers.forEach(clearTimeout); voiceTimers = []; }
+function voiceEnd(){ voiceMode = false; voiceTarget = 0; voiceInterim = ''; voiceFinal = ''; render(); }
+function voiceFinish(){
+  if(!voiceMode) return;
+  const t = (voiceInterim || voiceFinal).trim();
+  voiceStopRec(false);
+  if(t){
+    const c = chars(t), v = (capOn && c[0] !== c[0].toUpperCase()) ? c[0].toUpperCase() + c.slice(1).join('') : t;
+    ins(v); revealIdx = -1;
+    log(privateMode ? 'Voice input inserted (hidden).' : `Voice: <b>${escapeHtml(v)}</b>`);
+  } else log('Nothing was recognised.');
+  voiceEnd();
+}
+function voiceCancel(msg){ if(!voiceMode) return; voiceStopRec(true); log(msg || 'Voice input cancelled.'); voiceEnd(); }
+function startLeafHold(dirIdx){
+  leafStart = performance.now(); leafHoldDir = dirIdx;
+  const step = () => {
+    if(leafHoldDir !== dirIdx) return;
+    leafProg = Math.max(0, Math.min(1, (performance.now() - leafStart - RING_MS) / (LONG_MS - RING_MS)));
+    draw();
+    if(leafProg < 1) leafRaf = requestAnimationFrame(step);
+  };
+  step();
+}
+function stopLeafHold(){ leafHoldDir = -1; leafProg = 0; cancelAnimationFrame(leafRaf); draw(); }
+function togglePrivate(){
+  privateMode = !privateMode; revealIdx = -1;
+  log(privateMode ? '<b>Private input on:</b> no suggestions, no learning, no auto-capitals, typed characters are hidden.' : 'Private input off.');
+  render();
+}
 function home(){
   if(pickerIdx !== null){ camTarget = ovOrig; closeOverview(); return; }
-  if(open){ open = false; path = []; text = ''; log('Home: keyboard closed, input discarded.'); render(); }
+  if(open){ open = false; path = []; curMode = false; capsLock = false; buf = []; cur = 0; hist = []; shiftOnce = false; log('Home: keyboard closed, input discarded.'); render(); }
 }
 function pickerChoose(i){
   let d = ((i - pickerIdx + 4) % 3) - 1; if(d === 2) d = -1;
@@ -383,8 +601,8 @@ function pickerKey(code){
 
 // ---------- keyboard input: short / long presses ----------
 const LONG_MS = 1500, RING_MS = 400;   // under 0.4 s = short press; 0.4 s - 1.5 s = ring fills, release cancels; 2 s = long press
-const KEYMAP = { ArrowUp:'up', ArrowRight:'right', ArrowDown:'down', ArrowLeft:'left', Enter:'ok', Backspace:'back', KeyM:'menu', Escape:'home' };
-const CHIPS = [['←','ArrowLeft'],['↑','ArrowUp'],['↓','ArrowDown'],['→','ArrowRight'],['OK · Enter','Enter'],['Back · Backspace','Backspace'],['Menu · M','KeyM'],['Home · Esc','Escape']];
+const KEYMAP = { ArrowUp:'up', ArrowRight:'right', ArrowDown:'down', ArrowLeft:'left', Enter:'ok', Backspace:'back', KeyM:'menu', Escape:'home', KeyP:'private', KeyV:'voice' };
+const CHIPS = [['←','ArrowLeft'],['↑','ArrowUp'],['↓','ArrowDown'],['→','ArrowRight'],['OK · Enter','Enter'],['Back · Backspace','Backspace'],['Menu · M','KeyM'],['Voice · V','KeyV'],['Private input · P','KeyP'],['Home · Esc','Escape']];
 $('keys').innerHTML = CHIPS.map(([t,c])=>`<div class="chip" data-code="${c}"><span>${t}</span></div>`).join('');
 const chip = code => document.querySelector(`.chip[data-code="${code}"]`);
 
@@ -393,9 +611,23 @@ function press(code){
   const action = KEYMAP[code];
   if(!action || held[code]) return;
   const ch = chip(code); ch.classList.add('down');
+  if(voiceMode){ if(action === 'ok') voiceFinish(); else voiceCancel(); held[code] = {fired:true}; return; }
+  if(action==='voice'){ startVoice(); held[code] = {fired:true}; return; }
   if(pickerIdx !== null){ pickerKey(code); held[code] = {fired:true}; return; }
   if(action==='home'){ home(); held[code] = {fired:true}; return; }
-  if(['up','right','down','left'].includes(action)){ pressDir(action); held[code] = {fired:true}; return; }
+  if(action==='private'){ togglePrivate(); held[code] = {fired:true}; return; }
+  if(['up','right','down','left'].includes(action)){
+    if(open && !curMode && path.length === 2){            // third press on the shift slot: short = shift, hold = caps lock (the slot fills up)
+      const rs = resolve(path.concat(action)).sel, it = leaf(rs[0], rs[1], rs[2]);
+      if(typeof it === 'object' && it.cmd === 'shift'){
+        const h = held[code] = { fired:false, t0: performance.now(), shiftHold:true, dir:action };
+        startLeafHold(DIRS.indexOf(action));
+        h.t2 = setTimeout(() => { h.fired = true; stopLeafHold(); capsLock = true; shiftOnce = false; path = []; log('<b>Caps lock on.</b> The shift slot now turns it off.'); render(); }, LONG_MS);
+        return;
+      }
+    }
+    pressDir(action); held[code] = {fired:true}; return;
+  }
   const h = held[code] = { fired:false, t0: performance.now() };
   h.t1 = setTimeout(()=>ch.classList.add('hold'), RING_MS);
   if(open && action==='ok') startHold(code, '#2fc766', '#06210f');
@@ -416,6 +648,7 @@ function release(code){
   clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv);
   if(action==='ok' || action==='back') stopHold();
   delete held[code];
+  if(h.shiftHold){ stopLeafHold(); if(!h.fired && performance.now() - h.t0 <= RING_MS) pressDir(h.dir); return; }
   if(h.fired || performance.now() - h.t0 > RING_MS) return;   // long-press attempt released early: cancel, no short action
   if(action==='ok') okShort();
   else if(action==='back') backShort();
@@ -441,17 +674,20 @@ const DIRCODE = {up:'ArrowUp', right:'ArrowRight', down:'ArrowDown', left:'Arrow
 $('fx').addEventListener('pointerdown', e => {
   const wh = e.target.closest && e.target.closest('[data-wheel]');
   if(pickerIdx !== null && wh){ e.preventDefault(); pickerChoose(+wh.dataset.wheel); return; }
+  if(voiceMode && e.target.closest && e.target.closest('[data-mic]')){ e.preventDefault(); press('Enter'); setTimeout(() => release('Enter'), 40); return; }
   const t = e.target.closest && e.target.closest('[data-dir]');
   if(!t) return;
   e.preventDefault();
   const code = DIRCODE[t.dataset.dir];
-  press(code); setTimeout(() => release(code), 40);
+  press(code);
+  const end = () => { removeEventListener('pointerup', end); removeEventListener('pointercancel', end); release(code); };
+  addEventListener('pointerup', end); addEventListener('pointercancel', end);
 });
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('blur', () => {
   Object.values(held).forEach(h=>{ clearTimeout(h.t1); clearTimeout(h.t2); clearInterval(h.iv); });
   for(const k in held) delete held[k];
-  stopHold();
+  stopHold(); stopLeafHold();
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('down','hold'));
 });
 
